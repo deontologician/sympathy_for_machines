@@ -1,0 +1,23 @@
+{
+  "name": "sympathy_for_machines",
+  "version": "1.0.0",
+  "description": "Learn to sympathize with machines playing video games",
+  "main": "randomly.js",
+  "scripts": {
+    "build": "browserify --debug randomly.js -o sympathy_for_machines.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/deontologician/sympathy_for_machines.git"
+  },
+  "author": "Josh Kuhn",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/deontologician/sympathy_for_machines/issues"
+  },
+  "homepage": "https://github.com/deontologician/sympathy_for_machines#readme",
+  "dependencies": {
+    "pixi.js": "^4.3.4",
+    "random-seed": "^0.3.0"
+  }
+}

@@ -1,95 +1,131 @@
-let h = Math.max(document.documentElement.clientHeight, window.innerHeigh || 0)
-const SIZE = h// 512 // Pixel size of the complete grid
-const DIM = 16  // number of squares per side of the grid
-const SQUARE_SIZE = Math.floor(SIZE / DIM) // size of a grid square
-const FPS = 5  // frames per second
-const UPDATE_MS = Math.floor(1000 / FPS) // How many milliseconds per frame
-const CORRELATION_BOUND = 0.10 // Correlations must be this or 1 - this
-const GAME_LENGTH_MS = 2 * 60 * 1000  // milliseconds before heat death
-const LAYERED_PROB = 0.5  // Chance nodes will be layered
-const STATEFUL_PROB = 0.5 // Chance a node is stateful
-const NUM_NODES = 5 + Math.round(Math.random() * DIM * DIM * 0.10)
-const LAYERS = 4  // if nodes layered, use this many layers
-const YAY_POINTS = 10 // Points when the yay nodes are active
-const NO_POINTS = 10  // Points deducted when "no" nodes are active
-let CHEAT_MODE = false
+const representations = require('./representations.js')
+const PIXI = require('pixi.js')
+const Gen = require('random-seed')
 
-// Return the index of an array, given an array with proportional
-// weights for each index as values
-const randomByDist = (dist) => {
-  const total = dist.reduce((x,y) => x + y)
-  const val = Math.random() * total
-  let sum = 0
-  for(let i = 0; i < dist.length; i++) {
-    sum += dist[i]
-    if(sum >= val) {
-      return i
-    }
+class Config {
+  constructor({rand, height, width}) {
+    this.size = 512 // Pixel size of the complete grid
+    this.dim = 16  // number of squares per side of the grid
+    this.squareSize = Math.floor(this.size / this.dim) // size of a grid square
+    this.fps = 5  // frames per second
+    this.updateMs = Math.floor(1000 / this.fps) // How many milliseconds per frame
+    this.correlationBound = 0.10 // Correlations must be this or 1 - this
+    this.gameLengthMs = 2 * 60 * 1000  // milliseconds before heat death
+    this.layeredProb = 0.5  // Chance nodes will be layered
+    this.statefulProb = 0.5 // Chance a node is stateful
+    this.numNodes = 5 + Math.round(rand.random() * this.dim * this.dim * 0.10)
+    this.layers = 4  // if nodes layered, use this many layers
+    this.rewardPoints = 10 // Points when the reward nodes are active
+    this.punishPoints = 10  // Points deducted when "punish" nodes are active
+    this.screenHeight = height
+    this.screenWidth = width
+    this.cheatMode = false
   }
-  // Maybe rounding error?
-  return dist.length - 1
+
 }
 
-const correlation = () => {
-  let corr = Math.random() * CORRELATION_BOUND
+class Random {
 
-  if (boolWithProb(0.5)) {
-    return corr
-  } else {
-    return 1 - corr
+  constructor({seed}) {
+    this.gen = Gen.create(seed)
   }
-}
 
-const randomName = () => {
-  const consonants = "bcdfghjklmnpqrstvwxz"
-  const vowels = "aeiouy"
-  const len = randomInt(5,7)
-  let result = ""
-  for(let i = 0; i < len; i++) {
-    if (i % 2 === 0) {
-      result += consonants[randomInt(0, consonants.length - 1)]
+  random() {
+    return this.gen.random()
+  }
+
+  intBetween(min, max) {
+    return this.gen.intBetween(min, max)
+  }
+
+  boolWithProb(prob) {
+    return this.random() < prob
+  }
+
+  correlation(bound) {
+    let corr = this.random() * bound
+
+    if (this.boolWithProb(0.5)) {
+      return corr
     } else {
-      result += vowels[randomInt(0, vowels.length - 1)]
+      return 1 - corr
     }
   }
-  return result
-}
 
-const randomColor = () => {
-  return randomInt(0, 0xffffff)
-}
-
-
-function createProbMap(level) {
-  let probMap = {}
-  if(level === 1) {
-    probMap[true] = correlation()
-    probMap[false] = correlation()
-  } else {
-    probMap[true] = createProbMap(level - 1)
-    probMap[false] = createProbMap(level - 1)
+  randomName(){
+    const consonants = "bcdfghjklmnpqrstvwxz"
+    const vowels = "aeiouy"
+    const len = this.intBetween(5,7)
+    let result = ""
+    for(let i = 0; i < len; i++) {
+      if (i % 2 === 0) {
+        result += consonants[this.intBetween(0, consonants.length - 1)]
+      } else {
+        result += vowels[this.intBetween(0, vowels.length - 1)]
+      }
+    }
+    return result
   }
-  return probMap
+
+  randomColor() {
+    return this.intBetween(0, 0xffffff)
+  }
+
+  createProbMap(level, correlationBound) {
+    let probMap = {}
+    if(level === 1) {
+      probMap[true] = this.correlation(correlationBound)
+      probMap[false] = this.correlation(correlationBound)
+    } else {
+      probMap[true] = this.createProbMap(level - 1)
+      probMap[false] = this.createProbMap(level - 1)
+    }
+    return probMap
+  }
+
+  sample(arr, num) {
+    let s = new Set()
+    let results = []
+    let chosen
+    while(s.size < num) {
+      do {
+        chosen = this.intBetween(0, arr.length - 1)
+      } while(s.has(chosen))
+      s.add(chosen)
+      results.push(arr[chosen])
+    }
+    if (results.includes(undefined)) {
+      console.log('Results:', results)
+      console.log('Chosen', chosen)
+      console.log('s', s)
+      console.log('arr', arr)
+      throw new Error('Shit!')
+    }
+    return results
+  }
+
 }
 
 class Node {
-  constructor(parents) {
+  constructor({parents, rand, config}) {
+    this.rand = rand
     this.parents = parents.slice()
-    this.stateful = boolWithProb(STATEFUL_PROB)
-    this.active = boolWithProb(0.5)
-    this.name = randomName()
+    this.stateful = rand.boolWithProb(config.statefulProb)
+    this.active = rand.boolWithProb(0.5)
+    this.name = rand.randomName()
     this.isRewarding = false
     this.isPunishing = false
     this.children = []
-    this.activeColor = randomColor()
-    this.inactiveColor = randomColor()
+    this.activeColor = rand.randomColor()
+    this.inactiveColor = rand.randomColor()
 
     if (this.stateful) {
       // Hey! This was easy to get t-1, calculate based on ourselves.
       this.parents.push(this)
     }
     this.parents.forEach(p => p.children.push(this))
-    this.probMap = createProbMap(this.parents.length)
+    this.probMap = rand.createProbMap(
+      this.parents.length, config.correlationBound)
     this.recalculate() // Get good probability based on dependencies
   }
 
@@ -104,7 +140,7 @@ class Node {
 
   recalculate() {
     let prob = this.prob()
-    this.active = boolWithProb(prob)
+    this.active = this.rand.boolWithProb(prob)
     if (this.active && this.isRewarding) {
       //console.log(`${this.name} gave a reward!`)
     }
@@ -128,35 +164,11 @@ class Node {
   }
 }
 
-class RandNode {
-  // Node that is randomly true or false with a given probability, but
-  // with no dependencies
-  constructor() {
-    this.active = boolWithProb(this.prob())
-    this.name = "Random"
-    this.children = []
-  }
-
-  prob() {
-    return 0.5
-  }
-
-  recalculate() {
-    this.active = boolWithProb(this.prob())
-    return this.active
-  }
-
-  toString() {
-    return `RandNode(active=${this.active})`
-  }
-
-  destroy() {
-  }
-}
-
 class HeatNode {
-  constructor(delta) {
-    this.target = Date.now() + GAME_LENGTH_MS
+  constructor({config, rand}) {
+    this.config = config
+    this.rand = rand
+    this.target = Date.now() + this.config.gameLengthMs
     this.active = true
     this.heatDeath = false
     this.name = "Heat"
@@ -172,12 +184,12 @@ class HeatNode {
         console.log('Heat death')
         this.heatDeath = true
       }
-      return remaining / GAME_LENGTH_MS
+      return remaining / this.config.gameLengthMs
     }
   }
 
   recalculate() {
-    this.active = boolWithProb(this.prob())
+    this.active = this.rand.boolWithProb(this.prob())
     return this.active
   }
 
@@ -210,7 +222,7 @@ class KeyNode {
     document.addEventListener('keyup', this.onKeyUp)
   }
 
-  recalculate() {
+  recalculate(rand) {
     return this.active
   }
 
@@ -226,40 +238,23 @@ class KeyNode {
 }
 
 // Note: this is buggy, just use a random library dangit
-const sample = (arr, num) => {
-  let s = new Set()
-  let results = []
-  let chosen
-  while(s.size < num) {
-    do {
-      chosen = randomInt(0, arr.length - 1)
-    } while(s.has(chosen))
-    s.add(chosen)
-    results.push(arr[chosen])
-  }
-  if (results.includes(undefined)) {
-    console.log('Results:', results)
-    console.log('Chosen', chosen)
-    console.log('s', s)
-    console.log('arr', arr)
-    throw new Error('Shit!')
-  }
-  return results
-}
 
 class LogicCenter {
 
-  constructor(totalNodes) {
-    this.totalNodes = totalNodes
-    if (boolWithProb(LAYERED_PROB)) {
-      this.nodeArray = this.makeLayeredNodes(totalNodes)
+  constructor({config, rand}) {
+    this.config = config
+    this.totalNodes = config.numNodes
+    this.rand = rand
+    this.config = config
+    if (rand.boolWithProb(config.layeredProb)) {
+      this.nodeArray = this.makeLayeredNodes(config.numNodes)
     } else {
-      this.nodeArray = this.makeUnconstrainedNodes(totalNodes)
+      this.nodeArray = this.makeUnconstrainedNodes(config.numNodes)
     }
-    let yayNode = this.nodeArray[this.nodeArray.length-1]
-    yayNode.isRewarding = true
-    let noNode = this.nodeArray[this.nodeArray.length-2]
-    noNode.isPunishing = true
+    let rewardNode = this.nodeArray[this.nodeArray.length-1]
+    rewardNode.isRewarding = true
+    let punishNode = this.nodeArray[this.nodeArray.length-2]
+    punishNode.isPunishing = true
   }
 
   destroy() {
@@ -275,9 +270,9 @@ class LogicCenter {
   reward() {
     return this.nodeArray.reduce((total, n) => {
       if (n.active && n.isRewarding) {
-        return total + YAY_POINTS
+        return total + this.config.rewardPoints
       } else if (n.active && n.isPunishing) {
-        return total - NO_POINTS
+        return total - this.config.punishPoints
       } else {
         return total
       }
@@ -292,8 +287,7 @@ class LogicCenter {
     // memoize since these create eventListeners
     if (!this._inputNodes) {
       this._inputNodes = [
-        new HeatNode(),
-        //new RandNode(),
+        new HeatNode({config: this.config, rand: this.rand}),
         new KeyNode('a'),
         new KeyNode('s'),
         new KeyNode('k'),
@@ -308,9 +302,9 @@ class LogicCenter {
     // No connectivity depth restrictions, still a dag
     let nodeArray = this.inputNodes()
     for(let i = 0; i < totalNodes; i++) {
-      let numParents = randomInt(1, Math.min(3, nodeArray.length))
-      let parents = sample(nodeArray, numParents)
-      nodeArray.push(new Node(parents))
+      let numParents = this.rand.intBetween(1, Math.min(3, nodeArray.length))
+      let parents = this.rand.sample(nodeArray, numParents)
+      nodeArray.push(new Node({parents, rand: this.rand, config: this.config}))
     }
     return nodeArray
   }
@@ -318,17 +312,17 @@ class LogicCenter {
   makeLayeredNodes(totalNodes) {
     console.log('Making layered nodes')
     // Connected only to previous layer
-    let nodesPerLayer = Math.floor(totalNodes / LAYERS)
+    let nodesPerLayer = Math.floor(totalNodes / this.config.layers)
     let layers = [this.inputNodes()]
     let nodesCreated = 0
-    for(let layer = 1; layer <= LAYERS; layer++) {
+    for(let layer = 1; layer <= this.config.layers; layer++) {
       layers[layer] = Array(nodesPerLayer)
       for(let i = 0; i < nodesPerLayer ||
-              (layer === LAYERS &&  nodesCreated < totalNodes); i++) {
+              (layer === this.config.layers &&  nodesCreated < totalNodes); i++) {
         // Creates a topological sorting of the DAG by construction
-        let numParents = randomInt(1, Math.min(3, layers[layer-1].length))
-        let parents = sample(layers[layer-1], numParents)
-        layers[layer][i] = new Node(parents)
+        let numParents = this.rand.intBetween(1, Math.min(3, layers[layer-1].length))
+        let parents = this.rand.sample(layers[layer-1], numParents)
+        layers[layer][i] = new Node({parents, rand: this.rand, config: this.config})
         nodesCreated += 1
       }
     }
@@ -337,43 +331,52 @@ class LogicCenter {
 }
 
 /// Rendering code etc below
-
-const randomInt = (minVal, maxVal) => {
-  return Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal
-}
-
-const boolWithProb = (prob) => {
-  return Math.random() < prob
-}
-
 class Gameboard {
-  constructor() {
-    console.log('Creating gameboard')
-    let w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
-    this.renderer = PIXI.autoDetectRenderer(w, SIZE)
+  constructor({config}) {
+    this.config = config
+    this.renderer = PIXI.autoDetectRenderer(config.screenWidth, config.size)
     this.stage = new PIXI.Container()
+
+    // Main board
     this.board = new PIXI.Graphics()
     this.stage.addChild(this.board)
+
+    // Score display
     this.oldscore = 0
     this.scoreText = new PIXI.Text(
       "0",
       {fontFamily: "Mono", fontSize: 30, fill: "white"}
     )
     this.stage.addChild(this.scoreText)
-    this.scoreText.position.set(SIZE + 5, 5)
+    this.scoreText.position.set(this.config.size + 5, 5)
+
+    // FPS display
+    this.totalFramesRendered = 0
+    this.startTime = Date.now()
+    this.fpsText = new PIXI.Text(
+      '',
+      {fontFamily: "Mono", fontSize:30, fill: "white"}
+    )
+    this.stage.addChild(this.fpsText)
+    this.fpsText.position.set(this.config.size + 5, 40)
+
+    // Shortcut to the canvas element
     this.view = this.renderer.view
   }
 
   render(boardstate, score) {
-    for(let i = 0; i < DIM; i++) {
-      for(let j = 0; j < DIM; j++) {
-        let x = i * SQUARE_SIZE
-        let y = j * SQUARE_SIZE
-        this.board.beginFill(boardstate[i * DIM + j])
-        this.board.drawRect(x, y, SQUARE_SIZE, SQUARE_SIZE)
+    // Render the board
+    for(let i = 0; i < this.config.dim; i++) {
+      for(let j = 0; j < this.config.dim; j++) {
+        let x = i * this.config.squareSize
+        let y = j * this.config.squareSize
+        this.board.beginFill(boardstate[i * this.config.dim + j])
+        this.board.drawRect(x, y, this.config.squareSize, this.config.squareSize)
         this.board.endFill()
       }
     }
+
+    // Render the score
     this.scoreText.text = String(score)
     if (score > this.oldscore) {
       this.scoreText.style['fill'] = 'green'
@@ -381,6 +384,17 @@ class Gameboard {
       this.scoreText.style['fill'] = 'red'
     }
     this.oldscore = score
+
+    // Render the FPS
+
+    if (this.config.cheatMode) {
+      let fps = this.totalFramesRendered / ((Date.now() - this.startTime) / 1000)
+      this.fpsText.text = `FPS: ${fps}`
+    }
+
+    this.totalFramesRendered += 1
+
+    // Output it then clear the board
     this.renderer.render(this.stage)
     this.board.clear()
   }
@@ -392,18 +406,21 @@ class Gameboard {
 
 
 class Game {
-  constructor() {
-    this.gameboard = new Gameboard()
+  constructor({rand, config, gameboard, logicCenter}) {
+    this.rand = rand
+    this.config = config
+    this.gameboard = gameboard
     this.boardstate = this.makeBoardState()
     this.score = 0
-    this.logic = new LogicCenter(NUM_NODES)
+    this.logic = logicCenter
   }
 
   start() {
     document.getElementById('container').appendChild(this.gameboard.view)
-    this.intervalId = setInterval(this.doRound.bind(this), UPDATE_MS)
+    this.intervalId = setInterval(this.doRound.bind(this), this.config.updateMs)
     this.doRound()
   }
+
   stop() {
     clearInterval(this.intervalId)
     this.gameboard.destroy()
@@ -433,24 +450,33 @@ class Game {
     this.logic.recalculate()
     this.score += this.logic.reward()
     let numInputs = this.logic.inputNodes().length
-    for(let i = 0; i < DIM; i++) {
-      for(let j = 0; j < DIM; j++) {
-        let pos = (i * DIM + j)
+    for(let i = 0; i < this.config.dim; i++) {
+      for(let j = 0; j < this.config.dim; j++) {
+        let pos = (i * this.config.dim + j)
         let node = this.logic.getNode(pos % this.logic.totalNodes)
-        let color = CHEAT_MODE ? this.secretColor(node) : node.color()
+        let color = this.config.cheatMode ? this.secretColor(node) : node.color()
         this.boardstate[pos] = color
       }
     }
   }
 
-
   makeBoardState() {
-    return new Float32Array(DIM*DIM)
+    return new Float32Array(Math.pow(this.config.dim, 2))
   }
 
 }
 
+function gameFromSeed(seed) {
+  let height = Math.max(document.documentElement.clientHeight, window.innerHeigh || 0)
+  let width = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
+  let rand = new Random({seed})
+  let config = new Config({rand, height, width})
+  let gameboard = new Gameboard({config})
+  let logicCenter = new LogicCenter({config, rand})
+  return new Game({rand, config, gameboard, logicCenter})
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  let game = window.game = new Game()
+  let game = window.game = gameFromSeed(Math.random())
   game.start()
 })

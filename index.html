@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <script src="./pixi.js"></script>
+        <style>
+         body {
+             margin: 0;
+             padding: 0;
+         }
+         .container {
+             display: flex;
+         }
+         #score {
+             font-size: 7em;
+             font-family: Monospace;
+         }
+         /* SVG styles */
+         .node rect {
+           stroke: #333;
+           fill: #fff;
+         }
+         .edgePath path {
+           stroke: #333;
+           fill: #333;
+           stroke-width: 1.5px;
+         }
+        </style>
+    </head>
+    <body>
+        <div id="container">
+        </div>
+        <svg id="node-graph">
+            <g/>
+        </svg>
+        <script src="./representations.js"></script>
+        <script src="./randomly.js"></script>
+    </body>
+</html>

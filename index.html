@@ -6,28 +6,38 @@
          body {
              margin: 0;
              padding: 0;
+             font-family: Helvetica;
          }
          .container {
              display: flex;
+         }
+         h3 {
+             color: #888;
          }
          #score {
              font-size: 7em;
              font-family: Monospace;
          }
          /* SVG styles */
-         .node rect {
-           stroke: #333;
-           fill: #fff;
+         .nodes {
+             fill: white;
+             stroke: black;
+             stroke-width: 0.1em;
          }
-         .edgePath path {
-           stroke: #333;
-           fill: #333;
-           stroke-width: 1.5px;
+         .links {
+             stroke: black;
+             stroke-width: 0.1em;
          }
+
         </style>
     </head>
     <body>
-        <div id="container">
+        <h1 id="gameseed"></h1>
+        <div id="container"></div>
+        <h3>(Controls are A,S,K,L keys)</h3>
+        <div id="graph">
+            <svg width="500" height="700">
+            </svg>
         </div>
         <script src="./sympathy_for_machines.js"></script>
     </body>

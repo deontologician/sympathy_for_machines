@@ -1,4 +1,5 @@
 const representations = require('./representations.js')
+const {Graph} = require('./graph.js')
 const PIXI = require('pixi.js')
 const Gen = require('random-seed')
 
@@ -11,7 +12,7 @@ class Config {
     this.updateMs = Math.floor(1000 / this.fps) // How many milliseconds per frame
     this.correlationBound = 0.10 // Correlations must be this or 1 - this
     this.gameLengthMs = 2 * 60 * 1000  // milliseconds before heat death
-    this.layeredProb = 0.5  // Chance nodes will be layered
+    this.layeredProb = 1.0  // Chance nodes will be layered
     this.statefulProb = 0.5 // Chance a node is stateful
     this.numNodes = 5 + Math.round(rand.random() * this.dim * this.dim * 0.10)
     this.layers = 4  // if nodes layered, use this many layers
@@ -27,7 +28,11 @@ class Config {
 class Random {
 
   constructor({seed}) {
-    this.gen = Gen.create(seed)
+    if (seed !== null) {
+      this.gen = Gen.create(seed)
+    } else {
+      this.gen = Gen.create(Math.random())
+    }
   }
 
   random() {
@@ -95,11 +100,11 @@ class Random {
       results.push(arr[chosen])
     }
     if (results.includes(undefined)) {
-      console.log('Results:', results)
-      console.log('Chosen', chosen)
-      console.log('s', s)
-      console.log('arr', arr)
-      throw new Error('Shit!')
+      console.error('Results:', results)
+      console.error('Chosen', chosen)
+      console.error('s', s)
+      console.error('arr', arr)
+      throw new Error('undefined unexpected')
     }
     return results
   }
@@ -167,6 +172,8 @@ class Node {
 class HeatNode {
   constructor({config, rand}) {
     this.config = config
+    this.fx = 12
+    this.fy = 12
     this.rand = rand
     this.target = Date.now() + this.config.gameLengthMs
     this.active = true
@@ -204,6 +211,8 @@ class HeatNode {
 class KeyNode {
   constructor(key) {
     this.key = key
+    this.fx = this.getFx()
+    this.fy = this.getFy()
     this.active = false
     this._shouldBeActive = false
     this.children = []
@@ -220,6 +229,20 @@ class KeyNode {
     }
     document.addEventListener('keydown', this.onKeyDown)
     document.addEventListener('keyup', this.onKeyUp)
+  }
+
+  getFx() {
+    switch(this.key) {
+    case 'a': return 42
+    case 's': return 82
+    case 'k': return 122
+    case 'l': return 162
+    default: return 0;
+    }
+  }
+
+  getFy() {
+    return 12
   }
 
   recalculate(rand) {
@@ -298,7 +321,6 @@ class LogicCenter {
   }
 
   makeUnconstrainedNodes(totalNodes) {
-    console.log('Making unconstrained nodes')
     // No connectivity depth restrictions, still a dag
     let nodeArray = this.inputNodes()
     for(let i = 0; i < totalNodes; i++) {
@@ -310,7 +332,6 @@ class LogicCenter {
   }
 
   makeLayeredNodes(totalNodes) {
-    console.log('Making layered nodes')
     // Connected only to previous layer
     let nodesPerLayer = Math.floor(totalNodes / this.config.layers)
     let layers = [this.inputNodes()]
@@ -326,6 +347,7 @@ class LogicCenter {
         nodesCreated += 1
       }
     }
+    this.layers = layers
     return [].concat.apply([], layers) // flatten
   }
 }
@@ -413,6 +435,7 @@ class Game {
     this.boardstate = this.makeBoardState()
     this.score = 0
     this.logic = logicCenter
+    this.graph = new Graph({logicCenter})
   }
 
   start() {
@@ -429,6 +452,7 @@ class Game {
 
   doRound() {
     this.determineLogic()
+    this.graph.ticked()
     requestAnimationFrame(() => {
       this.gameboard.render(this.boardstate, this.score)
     })
@@ -467,7 +491,7 @@ class Game {
 }
 
 function gameFromSeed(seed) {
-  let height = Math.max(document.documentElement.clientHeight, window.innerHeigh || 0)
+  let height = Math.max(document.documentElement.clientHeight, window.innerHeight || 0)
   let width = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
   let rand = new Random({seed})
   let config = new Config({rand, height, width})
@@ -476,7 +500,14 @@ function gameFromSeed(seed) {
   return new Game({rand, config, gameboard, logicCenter})
 }
 
+function displayGameSeed(seed) {
+  let gameTitle = seed[0].toUpperCase() + seed.slice(1)
+  document.getElementById('gameseed').innerHTML = gameTitle
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  let game = window.game = gameFromSeed(Math.random())
+  let gameSeed = (new Random({seed: undefined})).randomName()
+  displayGameSeed(gameSeed)
+  let game = window.game = gameFromSeed(gameSeed)
   game.start()
 })

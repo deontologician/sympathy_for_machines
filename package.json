@@ -4,7 +4,8 @@
   "description": "Learn to sympathize with machines playing video games",
   "main": "randomly.js",
   "scripts": {
-    "build": "browserify --debug randomly.js -o sympathy_for_machines.js"
+    "build": "browserify --debug randomly.js -o sympathy_for_machines.js",
+    "watch": "watchify randomly.js -o sympathy_for_machines.js -v"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,11 @@
   },
   "homepage": "https://github.com/deontologician/sympathy_for_machines#readme",
   "dependencies": {
+    "d3": "^4.10.2",
     "pixi.js": "^4.3.4",
     "random-seed": "^0.3.0"
+  },
+  "devDependencies": {
+    "watchify": "^3.9.0"
   }
 }

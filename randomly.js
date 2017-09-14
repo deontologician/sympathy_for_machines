@@ -124,6 +124,10 @@ class Node {
     this.activeColor = rand.randomColor()
     this.inactiveColor = rand.randomColor()
 
+    // These are set by the graph layout code
+    this.fx = null
+    this.fy = null
+
     if (this.stateful) {
       // Hey! This was easy to get t-1, calculate based on ourselves.
       this.parents.push(this)
@@ -172,14 +176,15 @@ class Node {
 class HeatNode {
   constructor({config, rand}) {
     this.config = config
-    this.fx = 12
-    this.fy = 12
     this.rand = rand
     this.target = Date.now() + this.config.gameLengthMs
     this.active = true
     this.heatDeath = false
     this.name = "Heat"
     this.children = []
+    // Set by graph layout code
+    this.fx = null
+    this.fy = null
   }
 
   prob() {
@@ -211,8 +216,6 @@ class HeatNode {
 class KeyNode {
   constructor(key) {
     this.key = key
-    this.fx = this.getFx()
-    this.fy = this.getFy()
     this.active = false
     this._shouldBeActive = false
     this.children = []
@@ -229,20 +232,6 @@ class KeyNode {
     }
     document.addEventListener('keydown', this.onKeyDown)
     document.addEventListener('keyup', this.onKeyUp)
-  }
-
-  getFx() {
-    switch(this.key) {
-    case 'a': return 42
-    case 's': return 82
-    case 'k': return 122
-    case 'l': return 162
-    default: return 0;
-    }
-  }
-
-  getFy() {
-    return 12
   }
 
   recalculate(rand) {
@@ -276,8 +265,10 @@ class LogicCenter {
     }
     let rewardNode = this.nodeArray[this.nodeArray.length-1]
     rewardNode.isRewarding = true
+    rewardNode.name = 'reward'
     let punishNode = this.nodeArray[this.nodeArray.length-2]
     punishNode.isPunishing = true
+    punishNode.name = 'punish'
   }
 
   destroy() {

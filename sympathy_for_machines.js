@@ -1,53 +1,117 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 const d3 = require('d3')
+
+const CIRCLE_RADIUS = 30
+const H_PADDING = 20
+const V_PADDING = 60
+const CIRCLE_DIAMETER = CIRCLE_RADIUS * 2
+const FONT_SIZE = "10pt"
+
+function xOffset(nodeIndex) {
+  return (nodeIndex * (CIRCLE_DIAMETER + H_PADDING)) + H_PADDING + CIRCLE_RADIUS
+}
+
+function yOffset(layerIndex) {
+  return (layerIndex * (CIRCLE_DIAMETER + V_PADDING)) + V_PADDING + CIRCLE_RADIUS
+}
+
 class Graph {
   constructor({logicCenter}) {
     console.log(logicCenter)
     let nodes = logicCenter.nodeArray
     let links = getLinks(nodes)
-    let svg = d3.select("svg"),
-        width = +svg.attr("width"),
-        height = +svg.attr("height")
+    let svg = d3.select("svg")
+    let width = +svg.attr("width")
+    let height = +svg.attr("height")
 
-    let simulation = d3.forceSimulation(logicCenter._inputNodes)
-        .force("link", d3.forceLink()
-               .id(d => d.name)
-               .distance(1)
-               .strength(0.01)
-              )
-        .force("charge", d3.forceManyBody())
-        .force("center", d3.forceCenter(width / 2, height / 2))
+    logicCenter.layers.forEach((layer, layerIndex) => {
+      layer.forEach((node, nodeIndex) => {
+        node.layerIndex = layerIndex
+        node.nodeIndex = nodeIndex
+        let g = svg.append("g")
+            .attr("id", `group-${node.name}`)
+        g.append("circle")
+          .attr("r", CIRCLE_RADIUS)
+          .attr("fill", "white")
+          .attr("stroke", "black")
+          .attr("stroke-width", "0.1em")
+          .attr("cx", xOffset(nodeIndex))
+          .attr("cy", yOffset(layerIndex))
+        g.append("text")
+          .attr("x", xOffset(nodeIndex))
+          .attr("y", yOffset(layerIndex))
+          .attr("font-size", FONT_SIZE)
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.3em")
+          .text(node.name)
+        let childIndex = 0
+        node.children.forEach((child) => {
+          if(child.name !== node.name) {
+            svg.append("line")
+              .attr("stroke", "black")
+              .attr("stroke-width", "0.1em")
+              .attr("x1", xOffset(nodeIndex))
+              .attr("y1", yOffset(layerIndex) + CIRCLE_RADIUS)
+              .attr("x2", xOffset(childIndex))
+              .attr("y2", yOffset(layerIndex + 1) - CIRCLE_RADIUS)
+            childIndex += 1
+          } else {
+            // self loop
+            let x = xOffset(nodeIndex) + CIRCLE_RADIUS
+            let y = yOffset(layerIndex)
+            let c1x = x + CIRCLE_RADIUS * 0.75
+            let c1y = y - CIRCLE_RADIUS * 0.75
+            let c2x = x + CIRCLE_RADIUS * 0.75
+            let c2y = y + CIRCLE_RADIUS * 0.75
+            svg.append("path")
+              .attr("stroke", "black")
+              .attr("stroke-width", "0.1em")
+              .attr("fill", "white")
+              .attr("d", `M ${x},${y} C${c1x},${c1y} ${c2x},${c2y} ${x},${y}`)
+            // don't increment childIndex because reasons
+          }
+        })
+      })
+    })
+    // let simulation = d3.forceSimulation(logicCenter._inputNodes)
+    //     .force("link", d3.forceLink()
+    //            .id(d => d.name)
+    //            .distance(1)
+    //            .strength(0.01)
+    //           )
+    //     .force("charge", d3.forceManyBody())
+    //     .force("center", d3.forceCenter(width / 2, height / 2))
 
-    this.link = svg.append("g")
-        .attr("class", "links")
-        .selectAll("line")
-        .data(links)
-        .enter().append("line")
+    // this.link = svg.append("g")
+    //     .attr("class", "links")
+    //     .selectAll("line")
+    //     .data(links)
+    //     .enter().append("line")
 
-    this.node = svg.append("g")
-        .attr("class", "nodes")
-        .selectAll("circle")
-        .data(nodes)
-      .enter().append("circle")
-        .attr("r", "10")
-        .attr("fill", determineFill)
-    this.node.append("title")
-      .text(d => d.name)
+    // this.node = svg.append("g")
+    //     .attr("class", "nodes")
+    //     .selectAll("circle")
+    //     .data(nodes)
+    //   .enter().append("circle")
+    //     .attr("r", "10")
+    //     .attr("fill", determineFill)
+    // this.node.append("title")
+    //   .text(d => d.name)
 
-    simulation.nodes(nodes).on("tick", this.ticked.bind(this))
-    simulation.force("link").links(links)
+    // simulation.nodes(nodes).on("tick", this.ticked.bind(this))
+    // simulation.force("link").links(links)
   }
 
   ticked() {
-    this.link
-      .attr("x1", d => d.source.x)
-      .attr("y1", d => d.source.y)
-      .attr("x2", d => d.target.x)
-      .attr("y2", d => d.target.y)
-    this.node
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y)
-      .attr("fill", determineFill)
+    // this.link
+    //   .attr("x1", d => d.source.x)
+    //   .attr("y1", d => d.source.y)
+    //   .attr("x2", d => d.target.x)
+    //   .attr("y2", d => d.target.y)
+    // this.node
+    //   .attr("cx", d => d.x)
+    //   .attr("cy", d => d.y)
+    //   .attr("fill", determineFill)
   }
 }
 
@@ -64665,6 +64729,10 @@ class Node {
     this.activeColor = rand.randomColor()
     this.inactiveColor = rand.randomColor()
 
+    // These are set by the graph layout code
+    this.fx = null
+    this.fy = null
+
     if (this.stateful) {
       // Hey! This was easy to get t-1, calculate based on ourselves.
       this.parents.push(this)
@@ -64713,14 +64781,15 @@ class Node {
 class HeatNode {
   constructor({config, rand}) {
     this.config = config
-    this.fx = 12
-    this.fy = 12
     this.rand = rand
     this.target = Date.now() + this.config.gameLengthMs
     this.active = true
     this.heatDeath = false
     this.name = "Heat"
     this.children = []
+    // Set by graph layout code
+    this.fx = null
+    this.fy = null
   }
 
   prob() {
@@ -64752,8 +64821,6 @@ class HeatNode {
 class KeyNode {
   constructor(key) {
     this.key = key
-    this.fx = this.getFx()
-    this.fy = this.getFy()
     this.active = false
     this._shouldBeActive = false
     this.children = []
@@ -64770,20 +64837,6 @@ class KeyNode {
     }
     document.addEventListener('keydown', this.onKeyDown)
     document.addEventListener('keyup', this.onKeyUp)
-  }
-
-  getFx() {
-    switch(this.key) {
-    case 'a': return 42
-    case 's': return 82
-    case 'k': return 122
-    case 'l': return 162
-    default: return 0;
-    }
-  }
-
-  getFy() {
-    return 12
   }
 
   recalculate(rand) {
@@ -64817,8 +64870,10 @@ class LogicCenter {
     }
     let rewardNode = this.nodeArray[this.nodeArray.length-1]
     rewardNode.isRewarding = true
+    rewardNode.name = 'reward'
     let punishNode = this.nodeArray[this.nodeArray.length-2]
     punishNode.isPunishing = true
+    punishNode.name = 'punish'
   }
 
   destroy() {

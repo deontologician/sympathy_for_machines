@@ -25,6 +25,12 @@ class Config {
 
 }
 
+function assert(condition, error) {
+  if (!condition) {
+    throw new Error(error)
+  }
+}
+
 class Random {
 
   constructor({seed}) {
@@ -149,12 +155,16 @@ class Node {
 
   recalculate() {
     let prob = this.prob()
+    let oldActive = this.active
     this.active = this.rand.boolWithProb(prob)
+    if (!oldActive && this.active) {
+      console.log(`${this.name} became active`)
+    } else if (oldActive && !this.active) {
+      console.log(`${this.name} became inactive`)
+    }
     if (this.active && this.isRewarding) {
-      //console.log(`${this.name} gave a reward!`)
     }
     if (this.active && this.isPunishing) {
-      //console.log(`${this.name} gave a punishment.`)
     }
     return this.active
   }
@@ -228,6 +238,7 @@ class KeyNode {
     this.onKeyDown = ({key}) => {
       if (key === this.key) {
         this.active = true
+        console.log(`Pressed the ${this.key} key`)
       }
     }
     document.addEventListener('keydown', this.onKeyDown)

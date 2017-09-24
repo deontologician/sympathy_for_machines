@@ -16,7 +16,6 @@ function yOffset(layerIndex) {
 
 class Graph {
   constructor({logicCenter}) {
-    console.log(logicCenter)
     let nodes = logicCenter.nodeArray
     let links = getLinks(nodes)
     let svg = d3.select("svg")
@@ -72,45 +71,8 @@ class Graph {
         })
       })
     })
-    // let simulation = d3.forceSimulation(logicCenter._inputNodes)
-    //     .force("link", d3.forceLink()
-    //            .id(d => d.name)
-    //            .distance(1)
-    //            .strength(0.01)
-    //           )
-    //     .force("charge", d3.forceManyBody())
-    //     .force("center", d3.forceCenter(width / 2, height / 2))
-
-    // this.link = svg.append("g")
-    //     .attr("class", "links")
-    //     .selectAll("line")
-    //     .data(links)
-    //     .enter().append("line")
-
-    // this.node = svg.append("g")
-    //     .attr("class", "nodes")
-    //     .selectAll("circle")
-    //     .data(nodes)
-    //   .enter().append("circle")
-    //     .attr("r", "10")
-    //     .attr("fill", determineFill)
-    // this.node.append("title")
-    //   .text(d => d.name)
-
-    // simulation.nodes(nodes).on("tick", this.ticked.bind(this))
-    // simulation.force("link").links(links)
   }
-
   ticked() {
-    // this.link
-    //   .attr("x1", d => d.source.x)
-    //   .attr("y1", d => d.source.y)
-    //   .attr("x2", d => d.target.x)
-    //   .attr("y2", d => d.target.y)
-    // this.node
-    //   .attr("cx", d => d.x)
-    //   .attr("cy", d => d.y)
-    //   .attr("fill", determineFill)
   }
 }
 

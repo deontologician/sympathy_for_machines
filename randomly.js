@@ -10,12 +10,10 @@ class Config {
     this.squareSize = Math.floor(this.size / this.dim) // size of a grid square
     this.fps = 5  // frames per second
     this.updateMs = Math.floor(1000 / this.fps) // How many milliseconds per frame
-    this.correlationBound = 0.10 // Correlations must be this or 1 - this
+    this.correlationBound = 0.25 // Correlations must be this or 1 - this
     this.gameLengthMs = 2 * 60 * 1000  // milliseconds before heat death
-    this.layeredProb = 1.0  // Chance nodes will be layered
     this.statefulProb = 0.5 // Chance a node is stateful
     this.numNodes = 5 + Math.round(rand.random() * this.dim * this.dim * 0.10)
-    this.layers = 4  // if nodes layered, use this many layers
     this.rewardPoints = 10 // Points when the reward nodes are active
     this.punishPoints = 10  // Points deducted when "punish" nodes are active
     this.screenHeight = height
@@ -88,8 +86,8 @@ class Random {
       probMap[true] = this.correlation(correlationBound)
       probMap[false] = this.correlation(correlationBound)
     } else {
-      probMap[true] = this.createProbMap(level - 1)
-      probMap[false] = this.createProbMap(level - 1)
+      probMap[true] = this.createProbMap(level - 1, correlationBound)
+      probMap[false] = this.createProbMap(level - 1, correlationBound)
     }
     return probMap
   }
@@ -269,11 +267,8 @@ class LogicCenter {
     this.totalNodes = config.numNodes
     this.rand = rand
     this.config = config
-    if (rand.boolWithProb(config.layeredProb)) {
-      this.nodeArray = this.makeLayeredNodes(config.numNodes)
-    } else {
-      this.nodeArray = this.makeUnconstrainedNodes(config.numNodes)
-    }
+    this.nodeArray = this.makeFCLayeredNodes(config.numNodes)
+    this.nodeRegistry = this.makeNodeRegistry(this.nodeArray)
     let rewardNode = this.nodeArray[this.nodeArray.length-1]
     rewardNode.isRewarding = true
     rewardNode.name = 'reward'
@@ -322,35 +317,31 @@ class LogicCenter {
     return this._inputNodes.slice()
   }
 
-  makeUnconstrainedNodes(totalNodes) {
-    // No connectivity depth restrictions, still a dag
-    let nodeArray = this.inputNodes()
-    for(let i = 0; i < totalNodes; i++) {
-      let numParents = this.rand.intBetween(1, Math.min(3, nodeArray.length))
-      let parents = this.rand.sample(nodeArray, numParents)
-      nodeArray.push(new Node({parents, rand: this.rand, config: this.config}))
-    }
-    return nodeArray
+  makeNodeRegistry(nodes) {
+    let reg = {}
+    nodes.forEach(node => {
+      reg[node.name] = node
+    })
+    reg
   }
 
-  makeLayeredNodes(totalNodes) {
-    // Connected only to previous layer
-    let nodesPerLayer = Math.floor(totalNodes / this.config.layers)
+  makeFCLayeredNodes(totalNodes) {
     let layers = [this.inputNodes()]
-    let nodesCreated = 0
-    for(let layer = 1; layer <= this.config.layers; layer++) {
-      layers[layer] = Array(nodesPerLayer)
-      for(let i = 0; i < nodesPerLayer ||
-              (layer === this.config.layers &&  nodesCreated < totalNodes); i++) {
-        // Creates a topological sorting of the DAG by construction
-        let numParents = this.rand.intBetween(1, Math.min(3, layers[layer-1].length))
-        let parents = this.rand.sample(layers[layer-1], numParents)
-        layers[layer][i] = new Node({parents, rand: this.rand, config: this.config})
-        nodesCreated += 1
+    for(let layer = 1,
+            nodesLeft = totalNodes,
+            nodesInThisLayer = 0;
+        nodesLeft > 0;
+        layer++) {
+      let nodesInThisLayer = this.rand.intBetween(2, Math.min(5, nodesLeft))
+      layers[layer] = []
+      let parents = layers[layer - 1]
+      for(let i = 0; i < nodesInThisLayer; i++) {
+        layers[layer].push(new Node({parents, rand: this.rand, config: this.config}))
       }
+      nodesLeft -= nodesInThisLayer
     }
     this.layers = layers
-    return [].concat.apply([], layers) // flatten
+    return [].concat.apply([], layers)
   }
 }
 

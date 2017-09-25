@@ -15,34 +15,116 @@ function yOffset(layerIndex) {
   return (layerIndex * (CIRCLE_DIAMETER + V_PADDING)) + V_PADDING + CIRCLE_RADIUS
 }
 
+function lineColor(link) {
+  let hue = link.weight < 0 ? 0 : 120
+  let lightness = Math.round(50 + Math.abs(link.weight) * 50)
+  return `hsl(${hue}, 100%, ${lightness}%)`
+}
+
 class Graph {
   constructor({logicCenter}) {
-    let nodes = logicCenter.nodeArray
-    let links = getLinks(nodes)
-    let svg = d3.select("svg")
-    let width = +svg.attr("width")
-    let height = +svg.attr("height")
+    this.nodeArray = logicCenter.nodeArray
+    this.links = getLinks(this.nodeArray)
+    this.svg = d3.select("svg")
+    this.layers = logicCenter.layers
 
-    logicCenter.layers.forEach((layer, layerIndex) => {
-      layer.forEach((node, nodeIndex) => {
-        node.layerIndex = layerIndex
-        node.nodeIndex = nodeIndex
-        let g = svg.append("g")
-            .attr("id", `group-${node.name}`)
-        g.append("circle")
-          .attr("r", CIRCLE_RADIUS)
-          .attr("fill", "white")
-          .attr("stroke", "black")
-          .attr("stroke-width", "0.1em")
-          .attr("cx", xOffset(nodeIndex))
-          .attr("cy", yOffset(layerIndex))
-        g.append("text")
-          .attr("x", xOffset(nodeIndex))
-          .attr("y", yOffset(layerIndex))
-          .attr("font-size", FONT_SIZE)
-          .attr("text-anchor", "middle")
-          .attr("dy", "0.3em")
-          .text(node.name)
+    // Preprocess the nodes so they have their layer
+    this.layers.forEach((layer, layerNum) => {
+      layer.forEach((node, offsetInLayer) => {
+        node.layerNum = layerNum
+        node.offsetInLayer = offsetInLayer
+      })
+    })
+
+    this.boundGraph()
+  }
+
+  makeLinks() {
+    let linkGraph = this.svg.selectAll('.links')
+        .data(getLinks(this.nodeArray))
+    let linkEnter = linkGraph.enter()
+        .append("line")
+        .attr("x1", d => xOffset(d.source.offsetInLayer))
+        .attr("y1", d => yOffset(d.source.layerNum) + CIRCLE_RADIUS)
+        .attr("x2", d => xOffset(d.target.offsetInLayer))
+        .attr("y2", d => yOffset(d.target.layerNum) - CIRCLE_RADIUS)
+        .attr("stroke-width", "0.1em")
+      .merge(linkGraph)
+        .attr("stroke", d => lineColor(d))
+        .attr("fill", d => lineColor(d))
+    // forEach((child) => {
+    //       if(child.name !== node.name) {
+    //         svg.append("line")
+    //           .attr("stroke", "black")
+    //           .attr("stroke-width", "0.1em")
+    //           .attr("x1", xOffset(nodeIndex))
+    //           .attr("y1", yOffset(layerIndex) + CIRCLE_RADIUS)
+    //           .attr("x2", xOffset(childIndex))
+    //           .attr("y2", yOffset(layerIndex + 1) - CIRCLE_RADIUS)
+    //         childIndex += 1
+    //       } else {
+    //         // self loop
+    //         let x = xOffset(nodeIndex) + CIRCLE_RADIUS
+    //         let y = yOffset(layerIndex)
+    //         let c1x = x + CIRCLE_RADIUS * 0.75
+    //         let c1y = y - CIRCLE_RADIUS * 0.75
+    //         let c2x = x + CIRCLE_RADIUS * 0.75
+    //         let c2y = y + CIRCLE_RADIUS * 0.75
+    //         svg.append("path")
+    //           .attr("stroke", "black")
+    //           .attr("stroke-width", "0.1em")
+    //           .attr("fill", "white")
+    //           .attr("d", `M ${x},${y} C${c1x},${c1y} ${c2x},${c2y} ${x},${y}`)
+    //         // don't increment childIndex because reasons
+    //       }
+    //     })
+  }
+
+  boundGraph() {
+    let layerGroups = this.svg.selectAll(".layer-groups")
+        .data(this.layers)
+
+    layerGroups.enter()
+      .append("g")
+      .attr("id", (d, i) => `layer-${i}`)
+      .classed("layer-groups", true)
+
+    let nodeGroups = layerGroups.selectAll(".node-groups")
+        .data(d => d)
+
+    let nodeEnter = nodeGroups.enter()
+      .append("g")
+      .attr("id", d => `node-${d.layerNum}-${d.offsetInLayer}`)
+      .classed("node-groups", true)
+
+    nodeEnter.append("circle")
+        .attr("r", CIRCLE_RADIUS)
+        .attr("stroke", "black")
+        .attr("stroke-width", "0.1em")
+        .attr("cx", d => xOffset(d.offsetInLayer))
+        .attr("cy", d => yOffset(d.layerNum))
+      .merge(nodeGroups.select("circle"))
+        .attr("fill", d => determineFill(d))
+
+    nodeEnter.append("text")
+        .attr("x", d => xOffset(d.offsetInLayer))
+        .attr("y", d => yOffset(d.layerNum))
+        .attr("font-size", FONT_SIZE)
+        .attr("text-anchor", "middle")
+        .attr("dy", "0.3em")
+        .text(d => d.name)
+      .merge(nodeGroups.select("text"))
+        .attr("fill", d => determineText(d))
+
+    this.makeLinks()
+  }
+
+  ticked() {
+    this.boundGraph()
+  }
+
+
+  nonBoundGraph(svg, links, layers) {
         let childIndex = 0
         node.children.forEach((child) => {
           if(child.name !== node.name) {
@@ -70,11 +152,8 @@ class Graph {
             // don't increment childIndex because reasons
           }
         })
-      })
-    })
   }
-  ticked() {
-  }
+
 }
 
 function wrapSecret(secretColor) {
@@ -93,11 +172,33 @@ function determineFill({active, isRewarding, isPunishing, stateful}) {
     }
 }
 
+function determineText({active, isRewarding, isPunishing, stateful}) {
+  if (isRewarding || isPunishing) {
+    return '#ffffff'
+  } else {
+    return active ? '#000000' : '#ffffff'
+  }
+}
+
+function calcWeight(parent, child) {
+  let currentProb = child.prob()
+  // Calculate what this link would do if it were the opposite
+  // activity
+  let hypotheticalActives = child.parents
+      .map(p => p === parent ? !p.active : p.active)
+  let alternativeProb = child.hypothetical(hypotheticalActives)
+  return currentProb - alternativeProb
+}
+
 function getLinks(nodes) {
   let links = []
   nodes.forEach(parent => {
     parent.children.forEach(child => {
-      links.push({source: parent.name, target: child.name})
+      links.push({
+        source: parent,
+        target: child,
+        weight: calcWeight(parent, child),
+      })
     })
   })
   return links
@@ -64577,9 +64678,9 @@ class Config {
     this.squareSize = Math.floor(this.size / this.dim) // size of a grid square
     this.fps = 5  // frames per second
     this.updateMs = Math.floor(1000 / this.fps) // How many milliseconds per frame
-    this.correlationBound = 0.25 // Correlations must be this or 1 - this
+    this.correlationBound = 0.5 // Correlations must be this or 1 - this
     this.gameLengthMs = 2 * 60 * 1000  // milliseconds before heat death
-    this.statefulProb = 0.5 // Chance a node is stateful
+    this.statefulProb = 0.2 // Chance a node is stateful
     this.numNodes = 5 + Math.round(rand.random() * this.dim * this.dim * 0.10)
     this.rewardPoints = 10 // Points when the reward nodes are active
     this.punishPoints = 10  // Points deducted when "punish" nodes are active
@@ -64618,6 +64719,10 @@ class Random {
     return this.random() < prob
   }
 
+  boundedFloat(lower, upper) {
+    return this.random() * (upper - lower) + lower
+  }
+
   correlation(bound) {
     let corr = this.random() * bound
 
@@ -64629,15 +64734,59 @@ class Random {
   }
 
   randomName(){
-    const consonants = "bcdfghjklmnpqrstvwxz"
-    const vowels = "aeiouy"
-    const len = this.intBetween(5,7)
+    const startBlends = [
+      'bl', 'br', 'ch', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl',
+      'gr', 'pl', 'pr', 'sc', 'sh', 'sk', 'sl', 'sm', 'sn',
+      'sp', 'st', 'sw', 'th', 'tr', 'tw', 'wh', 'wr', 'sch',
+      'scr', 'shr', 'sph', 'spl', 'squ', 'str', 'thr', 'qu',
+    ]
+    const endBlends = [
+      'nt', 'ck', 'mp', 'ch', 'st', 'nth', 'll',
+      'sh', 'th', 'rs', 'ght', 'sk',
+    ]
+    const consonants = [
+      ['b', 1.492],
+      ['c', 2.782],
+      ['d', 4.253],
+      ['f', 2.228],
+      ['g', 2.014],
+      ['h', 6.094],
+      ['j', 6.966],
+      ['k', 0.153],
+      ['l', 4.025],
+      ['m', 2.406],
+      ['n', 6.749],
+      ['p', 1.929],
+      ['qu', 0.095],
+      ['r', 5.987],
+      ['s', 6.327],
+      ['t', 9.056],
+      ['v', 0.978],
+      ['w', 2.360],
+      ['x', 0.150],
+      ['y', 1.974],
+      ['z', 0.074],
+    ]
+    const vowels = [
+      ['a', 5], ['ai', 1],
+      ['e', 6], ['ei', 1], ['ea', 1],
+      ['i', 5], ['ie', 1],
+      ['o', 5], ['ou', 1],
+      ['u', 1], ['ui', 1],
+    ]
+    const len = this.intBetween(5, 7)
     let result = ""
     for(let i = 0; i < len; i++) {
-      if (i % 2 === 0) {
-        result += consonants[this.intBetween(0, consonants.length - 1)]
+      if (i == 0 && this.boolWithProb(0.5)) {
+        result += this.choice(startBlends)
+      } else if (i % 2 === 0) {
+        if (i == len - 1 && this.boolWithProb(0.3)) {
+          result += this.choice(endBlends)
+        } else {
+          result += this.multinomialChoice(consonants)
+        }
       } else {
-        result += vowels[this.intBetween(0, vowels.length - 1)]
+        result += this.multinomialChoice(vowels)
       }
     }
     return result
@@ -64659,6 +64808,10 @@ class Random {
     return probMap
   }
 
+  choice(arr) {
+    return arr[this.intBetween(0, arr.length - 1)]
+  }
+
   sample(arr, num) {
     let s = new Set()
     let results = []
@@ -64678,6 +64831,21 @@ class Random {
       throw new Error('undefined unexpected')
     }
     return results
+  }
+
+  // Takes an array of tuples with [value, weight]
+  // Weights are not assumed to sum to 1.0
+  multinomialChoice(weights) {
+    const total = weights.reduce((total, elem) => total + elem[1], 0)
+    const threshold = this.boundedFloat(0, total)
+    let runningSum = 0
+    for(let i = 0; i < weights.length; i++) {
+      runningSum += weights[i][1]
+      if (runningSum >= threshold) {
+        return weights[i][0]
+      }
+    }
+    return weights[weights.length - 1][0]
   }
 
 }
@@ -64711,6 +64879,11 @@ class Node {
 
   prob() {
     const actives = this.parents.map(p => p.active)
+    return this.hypothetical(actives)
+  }
+
+  hypothetical(actives) {
+    actives = actives.slice()
     let pmap = this.probMap
     while(actives.length > 1) {
       pmap = pmap[actives.shift()]
@@ -64720,17 +64893,7 @@ class Node {
 
   recalculate() {
     let prob = this.prob()
-    let oldActive = this.active
     this.active = this.rand.boolWithProb(prob)
-    if (!oldActive && this.active) {
-      console.log(`${this.name} became active`)
-    } else if (oldActive && !this.active) {
-      console.log(`${this.name} became inactive`)
-    }
-    if (this.active && this.isRewarding) {
-    }
-    if (this.active && this.isPunishing) {
-    }
     return this.active
   }
 
@@ -64803,7 +64966,6 @@ class KeyNode {
     this.onKeyDown = ({key}) => {
       if (key === this.key) {
         this.active = true
-        console.log(`Pressed the ${this.key} key`)
       }
     }
     document.addEventListener('keydown', this.onKeyDown)
@@ -64834,14 +64996,15 @@ class LogicCenter {
     this.totalNodes = config.numNodes
     this.rand = rand
     this.config = config
-    this.nodeArray = this.makeFCLayeredNodes(config.numNodes)
-    this.nodeRegistry = this.makeNodeRegistry(this.nodeArray)
+    this.layers = this.makeFCLayeredNodes(config.numNodes)
+    this.nodeArray = [].concat.apply([], this.layers)
     let rewardNode = this.nodeArray[this.nodeArray.length-1]
     rewardNode.isRewarding = true
     rewardNode.name = 'reward'
     let punishNode = this.nodeArray[this.nodeArray.length-2]
     punishNode.isPunishing = true
     punishNode.name = 'punish'
+    this.nodeRegistry = this.makeNodeRegistry(this.nodeArray)
   }
 
   destroy() {
@@ -64889,16 +65052,12 @@ class LogicCenter {
     nodes.forEach(node => {
       reg[node.name] = node
     })
-    reg
+    return reg
   }
 
   makeFCLayeredNodes(totalNodes) {
     let layers = [this.inputNodes()]
-    for(let layer = 1,
-            nodesLeft = totalNodes,
-            nodesInThisLayer = 0;
-        nodesLeft > 0;
-        layer++) {
+    for(let layer = 1, nodesLeft = totalNodes; nodesLeft > 0; layer++) {
       let nodesInThisLayer = this.rand.intBetween(2, Math.min(5, nodesLeft))
       layers[layer] = []
       let parents = layers[layer - 1]
@@ -64907,8 +65066,7 @@ class LogicCenter {
       }
       nodesLeft -= nodesInThisLayer
     }
-    this.layers = layers
-    return [].concat.apply([], layers)
+    return layers
   }
 }
 

@@ -1,3 +1,5 @@
+'use strict';
+
 const representations = require('./representations.js')
 const {Graph} = require('./graph.js')
 const PIXI = require('pixi.js')

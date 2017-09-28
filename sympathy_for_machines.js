@@ -1,4 +1,6 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+'use strict'
+
 const d3 = require('d3')
 
 const CIRCLE_RADIUS = 30
@@ -15,9 +17,9 @@ function yOffset(layerIndex) {
   return (layerIndex * (CIRCLE_DIAMETER + V_PADDING)) + V_PADDING + CIRCLE_RADIUS
 }
 
-function lineColor(link) {
-  let hue = link.weight < 0 ? 0 : 120
-  let lightness = Math.round(50 + Math.abs(link.weight) * 50)
+function lineColor(weight) {
+  let hue = weight < 0 ? 0 : 120
+  let lightness = Math.round(50 + Math.abs(weight) * 50)
   return `hsl(${hue}, 100%, ${lightness}%)`
 }
 
@@ -41,17 +43,18 @@ class Graph {
 
   makeLinks() {
     let linkGraph = this.svg.selectAll('.links')
-        .data(getLinks(this.nodeArray))
+        .data(this.links)
     let linkEnter = linkGraph.enter()
         .append("line")
+        .classed("links", true)
+        .attr("id", d => `from-${d.source.name}-to-${d.target.name}`)
         .attr("x1", d => xOffset(d.source.offsetInLayer))
         .attr("y1", d => yOffset(d.source.layerNum) + CIRCLE_RADIUS)
         .attr("x2", d => xOffset(d.target.offsetInLayer))
         .attr("y2", d => yOffset(d.target.layerNum) - CIRCLE_RADIUS)
-        .attr("stroke-width", "0.1em")
       .merge(linkGraph)
-        .attr("stroke", d => lineColor(d))
-        .attr("fill", d => lineColor(d))
+        .attr("stroke", d => lineColor(calcWeight(d.source, d.target)))
+
     // forEach((child) => {
     //       if(child.name !== node.name) {
     //         svg.append("line")
@@ -98,15 +101,15 @@ class Graph {
       .classed("node-groups", true)
 
     nodeEnter.append("circle")
+        .classed("node", true)
         .attr("r", CIRCLE_RADIUS)
-        .attr("stroke", "black")
-        .attr("stroke-width", "0.1em")
         .attr("cx", d => xOffset(d.offsetInLayer))
         .attr("cy", d => yOffset(d.layerNum))
       .merge(nodeGroups.select("circle"))
         .attr("fill", d => determineFill(d))
 
     nodeEnter.append("text")
+        .classed("node-text", true)
         .attr("x", d => xOffset(d.offsetInLayer))
         .attr("y", d => yOffset(d.layerNum))
         .attr("font-size", FONT_SIZE)
@@ -114,7 +117,7 @@ class Graph {
         .attr("dy", "0.3em")
         .text(d => d.name)
       .merge(nodeGroups.select("text"))
-        .attr("fill", d => determineText(d))
+        .attr("stroke", d => determineText(d))
 
     this.makeLinks()
   }
@@ -191,17 +194,11 @@ function calcWeight(parent, child) {
 }
 
 function getLinks(nodes) {
-  let links = []
-  nodes.forEach(parent => {
-    parent.children.forEach(child => {
-      links.push({
+  return nodes.reduce((sum, parent) =>
+      sum.concat(parent.children.map(child => ({
         source: parent,
         target: child,
-        weight: calcWeight(parent, child),
-      })
-    })
-  })
-  return links
+      }))), [])
 }
 
 exports.Graph = Graph
@@ -64666,6 +64663,8 @@ function extend() {
 }
 
 },{}],255:[function(require,module,exports){
+'use strict';
+
 const representations = require('./representations.js')
 const {Graph} = require('./graph.js')
 const PIXI = require('pixi.js')

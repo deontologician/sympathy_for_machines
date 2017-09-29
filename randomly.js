@@ -504,7 +504,9 @@ class Game {
 
   doRound() {
     this.determineLogic()
-    this.graph.ticked()
+    if (this.config.cheatMode) {
+      this.graph.render()
+    }
     requestAnimationFrame(() => {
       this.gameboard.render(this.boardstate, this.score)
     })

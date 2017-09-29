@@ -37,45 +37,9 @@ class Graph {
         node.offsetInLayer = offsetInLayer
       })
     })
-
-    this.boundGraph()
   }
 
-  makeLinks() {
-    let linkGraph = this.svg.selectAll('.links')
-        .data(this.links)
-    let linkEnter = linkGraph.enter()
-
-    // Links from one layer to another
-    let lines = linkEnter.filter(d => d.source !== d.target)
-        .append("line")
-        .classed("links", true)
-        .attr("id", d => `from-${d.source.name}-to-${d.target.name}`)
-        .attr("x1", d => xOffset(d.source.offsetInLayer))
-        .attr("y1", d => yOffset(d.source.layerNum) + CIRCLE_RADIUS)
-        .attr("x2", d => xOffset(d.target.offsetInLayer))
-        .attr("y2", d => yOffset(d.target.layerNum) - CIRCLE_RADIUS)
-
-    // Need to handle self-links differently
-    let paths = linkEnter.filter(d => d.source === d.target)
-      .append("path")
-      .classed("links", true)
-      .attr("d", d => {
-        let x = xOffset(d.source.offsetInLayer) + CIRCLE_RADIUS
-        let y = yOffset(d.source.layerNum)
-        let c1x = x + CIRCLE_RADIUS * 0.75
-        let c1y = y - CIRCLE_RADIUS * 0.75
-        let c2x = x + CIRCLE_RADIUS * 0.75
-        let c2y = y + CIRCLE_RADIUS * 0.75
-        return `M ${x},${y} C${c1x},${c1y} ${c2x},${c2y} ${x},${y}`
-      })
-
-    // Update the stroke on everything the same
-    linkGraph.merge(paths).merge(lines)
-      .attr("stroke", d => lineColor(calcWeight(d.source, d.target)))
-  }
-
-  boundGraph() {
+  render() {
     let layerGroups = this.svg.selectAll(".layer-groups")
         .data(this.layers)
 
@@ -111,42 +75,39 @@ class Graph {
       .merge(nodeGroups.select("text"))
         .attr("fill", d => determineText(d))
 
-    this.makeLinks()
-  }
+    // Making links
 
-  ticked() {
-    this.boundGraph()
-  }
+    let linkGraph = this.svg.selectAll('.links')
+        .data(this.links)
+    let linkEnter = linkGraph.enter()
 
+    // Links from one layer to another
+    let lines = linkEnter.filter(d => d.source !== d.target)
+        .append("line")
+        .classed("links", true)
+        .attr("id", d => `from-${d.source.name}-to-${d.target.name}`)
+        .attr("x1", d => xOffset(d.source.offsetInLayer))
+        .attr("y1", d => yOffset(d.source.layerNum) + CIRCLE_RADIUS)
+        .attr("x2", d => xOffset(d.target.offsetInLayer))
+        .attr("y2", d => yOffset(d.target.layerNum) - CIRCLE_RADIUS)
 
-  nonBoundGraph(svg, links, layers) {
-        let childIndex = 0
-        node.children.forEach((child) => {
-          if(child.name !== node.name) {
-            svg.append("line")
-              .attr("stroke", "black")
-              .attr("stroke-width", "0.1em")
-              .attr("x1", xOffset(nodeIndex))
-              .attr("y1", yOffset(layerIndex) + CIRCLE_RADIUS)
-              .attr("x2", xOffset(childIndex))
-              .attr("y2", yOffset(layerIndex + 1) - CIRCLE_RADIUS)
-            childIndex += 1
-          } else {
-            // self loop
-            let x = xOffset(nodeIndex) + CIRCLE_RADIUS
-            let y = yOffset(layerIndex)
-            let c1x = x + CIRCLE_RADIUS * 0.75
-            let c1y = y - CIRCLE_RADIUS * 0.75
-            let c2x = x + CIRCLE_RADIUS * 0.75
-            let c2y = y + CIRCLE_RADIUS * 0.75
-            svg.append("path")
-              .attr("stroke", "black")
-              .attr("stroke-width", "0.1em")
-              .attr("fill", "white")
-              .attr("d", `M ${x},${y} C${c1x},${c1y} ${c2x},${c2y} ${x},${y}`)
-            // don't increment childIndex because reasons
-          }
-        })
+    // Need to handle self-links differently
+    let paths = linkEnter.filter(d => d.source === d.target)
+      .append("path")
+      .classed("links", true)
+      .attr("d", d => {
+        let x = xOffset(d.source.offsetInLayer) + CIRCLE_RADIUS
+        let y = yOffset(d.source.layerNum)
+        let c1x = x + CIRCLE_RADIUS * 0.75
+        let c1y = y - CIRCLE_RADIUS * 0.75
+        let c2x = x + CIRCLE_RADIUS * 0.75
+        let c2y = y + CIRCLE_RADIUS * 0.75
+        return `M ${x},${y} C${c1x},${c1y} ${c2x},${c2y} ${x},${y}`
+      })
+
+    // Update the stroke on everything the same
+    linkGraph.merge(paths).merge(lines)
+      .attr("stroke", d => lineColor(calcWeight(d.source, d.target)))
   }
 
 }
@@ -65161,7 +65122,9 @@ class Game {
 
   doRound() {
     this.determineLogic()
-    this.graph.ticked()
+    if (this.config.cheatMode) {
+      this.graph.render()
+    }
     requestAnimationFrame(() => {
       this.gameboard.render(this.boardstate, this.score)
     })

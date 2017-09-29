@@ -327,7 +327,7 @@ class LogicCenter {
 
   constructor({config, rand}) {
     this.config = config
-    this.totalNodes = config.numNodes
+    this.numDependentNodes = config.numNodes
     this.rand = rand
     this.config = config
     this.layers = this.makeFCLayeredNodes(config.numNodes)
@@ -364,7 +364,12 @@ class LogicCenter {
   }
 
   getNode(index) {
-    return this.nodeArray[index + this._inputNodes.length]
+    // Sometimes the node creator gets overzealous and creates too
+    // many nodes. In this case we use the actual number of nodes
+    // instead of the config.numNodes setting
+    let realLength = this.nodeArray.length - this._inputNodes.length
+    let corrected = index % realLength
+    return this.nodeArray[corrected + this._inputNodes.length]
   }
 
   inputNodes() {
@@ -389,9 +394,9 @@ class LogicCenter {
     return reg
   }
 
-  makeFCLayeredNodes(totalNodes) {
+  makeFCLayeredNodes(numDependentNodes) {
     let layers = [this.inputNodes()]
-    for(let layer = 1, nodesLeft = totalNodes; nodesLeft > 0; layer++) {
+    for(let layer = 1, nodesLeft = numDependentNodes; nodesLeft > 0; layer++) {
       let nodesInThisLayer = this.rand.intBetween(2, Math.min(5, nodesLeft))
       layers[layer] = []
       let parents = layers[layer - 1]
@@ -527,11 +532,10 @@ class Game {
   determineLogic() {
     this.logic.recalculate()
     this.score += this.logic.reward()
-    let numInputs = this.logic.inputNodes().length
     for(let i = 0; i < this.config.dim; i++) {
       for(let j = 0; j < this.config.dim; j++) {
         let pos = (i * this.config.dim + j)
-        let node = this.logic.getNode(pos % this.logic.totalNodes)
+        let node = this.logic.getNode(pos)
         let color = this.config.cheatMode ? this.secretColor(node) : node.color()
         this.boardstate[pos] = color
       }

@@ -117,7 +117,7 @@ class Graph {
         .attr("dy", "0.3em")
         .text(d => d.name)
       .merge(nodeGroups.select("text"))
-        .attr("stroke", d => determineText(d))
+        .attr("fill", d => determineText(d))
 
     this.makeLinks()
   }
